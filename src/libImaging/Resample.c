@@ -5,20 +5,20 @@
 #define ROUND_UP(f) ((int)((f) >= 0.0 ? (f) + 0.5F : (f) - 0.5F))
 
 struct filter {
-    double (*filter)(double x);
-    double support;
+    float (*filter)(float x);
+    float support;
 };
 
-static inline double
-box_filter(double x) {
+static inline float
+box_filter(float x) {
     if (x > -0.5 && x <= 0.5) {
         return 1.0;
     }
     return 0.0;
 }
 
-static inline double
-bilinear_filter(double x) {
+static inline float
+bilinear_filter(float x) {
     if (x < 0.0) {
         x = -x;
     }
@@ -28,8 +28,8 @@ bilinear_filter(double x) {
     return 0.0;
 }
 
-static inline double
-hamming_filter(double x) {
+static inline float
+hamming_filter(float x) {
     if (x < 0.0) {
         x = -x;
     }
@@ -40,11 +40,11 @@ hamming_filter(double x) {
         return 0.0;
     }
     x = x * M_PI;
-    return sin(x) / x * (0.54f + 0.46f * cos(x));
+    return sinf(x) / x * (0.54f + 0.46f * cosf(x));
 }
 
-static inline double
-bicubic_filter(double x) {
+static inline float
+bicubic_filter(float x) {
     /* https://en.wikipedia.org/wiki/Bicubic_interpolation#Bicubic_convolution_algorithm
      */
 #define a -0.5
@@ -61,17 +61,17 @@ bicubic_filter(double x) {
 #undef a
 }
 
-static inline double
-sinc_filter(double x) {
+static inline float
+sinc_filter(float x) {
     if (x == 0.0) {
         return 1.0;
     }
     x = x * M_PI;
-    return sin(x) / x;
+    return sinf(x) / x;
 }
 
-static inline double
-lanczos_filter(double x) {
+static inline float
+lanczos_filter(float x) {
     /* truncated sinc */
     if (-3.0 <= x && x < 3.0) {
         return sinc_filter(x) * sinc_filter(x / 3);
@@ -186,16 +186,16 @@ precompute_coeffs(
     int outSize,
     struct filter *filterp,
     int **boundsp,
-    double **kkp
+    float **kkp
 ) {
-    double support, scale, filterscale;
-    double center, ww, ss;
+    float support, scale, filterscale;
+    float center, ww, ss;
     int xx, x, ksize, xmin, xmax;
     int *bounds;
-    double *kk, *k;
+    float *kk, *k;
 
     /* prepare for horizontal stretch */
-    filterscale = scale = (double)(in1 - in0) / outSize;
+    filterscale = scale = (float)(in1 - in0) / outSize;
     filterscale = MAX(filterscale, 1.0);
 
     /* determine support size (length of resampling filter) */
@@ -205,20 +205,20 @@ precompute_coeffs(
     ksize = (int)ceil(support) * 2 + 1;
 
     // check for overflow
-    if (outSize > INT_MAX / (ksize * (int)sizeof(double))) {
+    if (outSize > INT_MAX / (ksize * (int)sizeof(float))) {
         ImagingError_MemoryError();
         return 0;
     }
 
     /* coefficient buffer */
     /* malloc check ok, overflow checked above */
-    kk = malloc(outSize * ksize * sizeof(double));
+    kk = malloc(outSize * ksize * sizeof(float));
     if (!kk) {
         ImagingError_MemoryError();
         return 0;
     }
 
-    /* malloc check ok, ksize*sizeof(double) > 2*sizeof(int) */
+    /* malloc check ok, ksize*sizeof(float) > 2*sizeof(int) */
     bounds = malloc(outSize * 2 * sizeof(int));
     if (!bounds) {
         free(kk);
@@ -264,7 +264,7 @@ precompute_coeffs(
 }
 
 void
-normalize_coeffs_8bpc(int outSize, int ksize, double *prekk) {
+normalize_coeffs_8bpc(int outSize, int ksize, float *prekk) {
     int x;
     INT32 *kk;
 
@@ -282,7 +282,7 @@ normalize_coeffs_8bpc(int outSize, int ksize, double *prekk) {
 
 void
 ImagingResampleHorizontal_8bpc(
-    Imaging imOut, Imaging imIn, int offset, int ksize, int *bounds, double *prekk
+    Imaging imOut, Imaging imIn, int offset, int ksize, int *bounds, float *prekk
 ) {
     ImagingSectionCookie cookie;
     int ss0, ss1, ss2, ss3;
@@ -375,7 +375,7 @@ ImagingResampleHorizontal_8bpc(
 
 void
 ImagingResampleVertical_8bpc(
-    Imaging imOut, Imaging imIn, int offset, int ksize, int *bounds, double *prekk
+    Imaging imOut, Imaging imIn, int offset, int ksize, int *bounds, float *prekk
 ) {
     ImagingSectionCookie cookie;
     int ss0, ss1, ss2, ss3;
@@ -459,12 +459,12 @@ ImagingResampleVertical_8bpc(
 
 void
 ImagingResampleHorizontal_32bpc(
-    Imaging imOut, Imaging imIn, int offset, int ksize, int *bounds, double *kk
+    Imaging imOut, Imaging imIn, int offset, int ksize, int *bounds, float *kk
 ) {
     ImagingSectionCookie cookie;
-    double ss;
+    float ss;
     int xx, yy, x, xmin, xmax;
-    double *k;
+    float *k;
 
     ImagingSectionEnter(&cookie);
     switch (imIn->type) {
@@ -503,12 +503,12 @@ ImagingResampleHorizontal_32bpc(
 
 void
 ImagingResampleVertical_32bpc(
-    Imaging imOut, Imaging imIn, int offset, int ksize, int *bounds, double *kk
+    Imaging imOut, Imaging imIn, int offset, int ksize, int *bounds, float *kk
 ) {
     ImagingSectionCookie cookie;
-    double ss;
+    float ss;
     int xx, yy, y, ymin, ymax;
-    double *k;
+    float *k;
 
     ImagingSectionEnter(&cookie);
     switch (imIn->type) {
@@ -546,7 +546,7 @@ ImagingResampleVertical_32bpc(
 }
 
 typedef void (*ResampleFunction)(
-    Imaging imOut, Imaging imIn, int offset, int ksize, int *bounds, double *kk
+    Imaging imOut, Imaging imIn, int offset, int ksize, int *bounds, float *kk
 );
 
 Imaging
@@ -634,7 +634,7 @@ ImagingResampleInner(
     int ybox_first, ybox_last;
     int ksize_horiz, ksize_vert;
     int *bounds_horiz, *bounds_vert;
-    double *kk_horiz, *kk_vert;
+    float *kk_horiz, *kk_vert;
 
     need_horizontal = xsize != imIn->xsize || box[0] || box[2] != xsize;
     need_vertical = ysize != imIn->ysize || box[1] || box[3] != ysize;
