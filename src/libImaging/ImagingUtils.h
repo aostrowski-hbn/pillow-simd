@@ -27,6 +27,9 @@
 
 #define CLIP8(v) ((v) <= 0 ? 0 : (v) < 256 ? (v) : 255)
 
+#define MAX(x, y) (((x) > (y)) ? (x) : (y))
+#define MIN(x, y) (((x) < (y)) ? (x) : (y))
+
 /* This is to work around a bug in GCC prior 4.9 in 64 bit mode.
    GCC generates code with partial dependency which is 3 times slower.
    See: https://stackoverflow.com/a/26588074/253146 */
