@@ -49,6 +49,14 @@ PLT markers.
 Security
 ========
 
+Restricted environment keys for ImageMath.eval
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+:cve:`2023-50447`: If an attacker has control over the keys passed to the
+``environment`` argument of :py:meth:`PIL.ImageMath.eval`, they may be able to execute
+arbitrary code. To prevent this, keys matching the names of builtins and keys
+containing double underscores will now raise a :py:exc:`ValueError`.
+
 Clear PPM half token after use
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
