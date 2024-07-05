@@ -17,6 +17,8 @@
  */
 
 #include "Imaging.h"
+#include <emmintrin.h>
+#include <smmintrin.h>
 
 int
 ImagingGetBBox(Imaging im, int bbox[4], int alpha_only) {
@@ -30,61 +32,76 @@ ImagingGetBBox(Imaging im, int bbox[4], int alpha_only) {
     bbox[1] = -1;
     bbox[2] = bbox[3] = 0;
 
-#define GETBBOX(image, mask)                                 \
-    /* first stage: looking for any pixels from top */       \
-    for (y = 0; y < im->ysize; y++) {                        \
-        has_data = 0;                                        \
-        for (x = 0; x < im->xsize; x++) {                    \
-            if (im->image[y][x] & mask) {                    \
-                has_data = 1;                                \
-                bbox[0] = x;                                 \
-                bbox[1] = y;                                 \
-                break;                                       \
-            }                                                \
-        }                                                    \
-        if (has_data) {                                      \
-            break;                                           \
-        }                                                    \
-    }                                                        \
-    /* Check that we have a box */                           \
-    if (bbox[1] < 0) {                                       \
-        return 0; /* no data */                              \
-    }                                                        \
-    /* second stage: looking for any pixels from bottom */   \
-    for (y = im->ysize - 1; y >= bbox[1]; y--) {             \
-        has_data = 0;                                        \
-        for (x = 0; x < im->xsize; x++) {                    \
-            if (im->image[y][x] & mask) {                    \
-                has_data = 1;                                \
-                if (x < bbox[0]) {                           \
-                    bbox[0] = x;                             \
-                }                                            \
-                bbox[3] = y + 1;                             \
-                break;                                       \
-            }                                                \
-        }                                                    \
-        if (has_data) {                                      \
-            break;                                           \
-        }                                                    \
-    }                                                        \
-    /* third stage: looking for left and right boundaries */ \
-    for (y = bbox[1]; y < bbox[3]; y++) {                    \
-        for (x = 0; x < bbox[0]; x++) {                      \
-            if (im->image[y][x] & mask) {                    \
-                bbox[0] = x;                                 \
-                break;                                       \
-            }                                                \
-        }                                                    \
-        for (x = im->xsize - 1; x >= bbox[2]; x--) {         \
-            if (im->image[y][x] & mask) {                    \
-                bbox[2] = x + 1;                             \
-                break;                                       \
-            }                                                \
-        }                                                    \
-    }
-
     if (im->image8) {
-        GETBBOX(image8, 0xff);
+        __m128i compare = _mm_set1_epi8(0x00);
+        for (y = 0; y < im->ysize; y++) {
+            UINT8 *in = im->image8[y];
+            has_data = 0;
+            for (x = 0; x < im->xsize - 15; x += 16) {
+                __m128i src = _mm_loadu_si128((__m128i *)(in + x));
+                if (! _mm_test_all_ones(_mm_cmpeq_epi8(compare, src))) {
+                    has_data = 1;
+                    for (int xx = x; xx < x + 16; xx++) {
+                        if (in[xx]) {
+                            bbox[0] = xx;
+                            break;
+                        }
+                    }
+                    bbox[1] = y;
+                    break;
+                }
+            }
+            if (has_data) {
+                break;
+            }
+            for (; x < im->xsize; x++) {
+                if (in[x]) {
+                    has_data = 1;
+                    bbox[0] = x;
+                    bbox[1] = y;
+                    break;
+                }
+            }
+            if (has_data) {
+                break;
+            }
+        }
+        /* Check that we have a box */
+        if (bbox[1] < 0) {
+            return 0; /* no data */
+        }
+        /* second stage: looking for any pixels from bottom */
+        for (y = im->ysize - 1; y >= bbox[1]; y--) {
+            has_data = 0;
+            for (x = 0; x < im->xsize; x++) {
+                if (im->image8[y][x]) {
+                    has_data = 1;
+                    if (x < bbox[0]) {
+                        bbox[0] = x;
+                    }
+                    bbox[3] = y + 1;
+                    break;
+                }
+            }
+            if (has_data) {
+                break;
+            }
+        }
+        /* third stage: looking for left and right boundaries */
+        for (y = bbox[1]; y < bbox[3]; y++) {
+            for (x = 0; x < bbox[0]; x++) {
+                if (im->image8[y][x]) {
+                    bbox[0] = x;
+                    break;
+                }
+            }
+            for (x = im->xsize - 1; x >= bbox[2]; x--) {
+                if (im->image8[y][x]) {
+                    bbox[2] = x + 1;
+                    break;
+                }
+            }
+        }
     } else {
         INT32 mask = 0xffffffff;
         if (im->bands == 3) {
@@ -100,7 +117,109 @@ ImagingGetBBox(Imaging im, int bbox[4], int alpha_only) {
             mask = 0xff000000;
 #endif
         }
-        GETBBOX(image32, mask);
+        __m128i mm_mask = _mm_set1_epi32(mask);
+        for (y = 0; y < im->ysize; y++) {
+            INT32 *in = im->image32[y];
+            has_data = 0;
+            for (x = 0; x < im->xsize - 3; x += 4) {
+                __m128i src = _mm_loadu_si128((__m128i *)(in + x));
+                if (! _mm_test_all_zeros(mm_mask, src)) {
+                    has_data = 1;
+                    for (int xx = x; xx < x + 4; xx++) {
+                        if (in[xx]) {
+                            bbox[0] = xx;
+                            break;
+                        }
+                    }
+                    bbox[1] = y;
+                    break;
+                }
+            }
+            if (has_data) {
+                break;
+            }
+            for (; x < im->xsize; x++) {
+                if (in[x] & mask) {
+                    has_data = 1;
+                    bbox[0] = x;
+                    bbox[1] = y;
+                    break;
+                }
+            }
+            if (has_data) {
+                break;
+            }
+        }
+        /* Check that we have a box */
+        if (bbox[1] < 0) {
+            return 0; /* no data */
+        }
+        /* second stage: looking for any pixels from bottom */
+        for (y = im->ysize - 1; y >= bbox[1]; y--) {
+            INT32 *in = im->image32[y];
+            has_data = 0;
+            for (x = 0; x < im->xsize - 3; x += 4) {
+                __m128i src = _mm_loadu_si128((__m128i *)(in + x));
+                if (! _mm_test_all_zeros(mm_mask, src)) {
+                    has_data = 1;
+                    bbox[3] = y + 1;
+                    break;
+                }
+            }
+            if (has_data) {
+                break;
+            }
+            for (; x < im->xsize; x++) {
+                if (in[x] & mask) {
+                    has_data = 1;
+                    bbox[3] = y + 1;
+                    break;
+                }
+            }
+            if (has_data) {
+                break;
+            }
+        }
+        /* third stage: looking for left and right boundaries */
+        for (y = bbox[1]; y < bbox[3]; y++) {
+            INT32 *in = im->image32[y];
+            for (x = 0; x < bbox[0] - 3; x += 4) {
+                __m128i src = _mm_loadu_si128((__m128i *)(in + x));
+                if (! _mm_test_all_zeros(mm_mask, src)) {
+                    for (int xx = x; xx < x + 4; xx++) {
+                        if (in[xx]) {
+                            bbox[0] = xx;
+                            break;
+                        }
+                    }
+                    break;
+                }
+            }
+            for (; x < bbox[0]; x++) {
+                if (in[x] & mask) {
+                    bbox[0] = x;
+                    break;
+                }
+            }
+            for (x = im->xsize - 1; x >= bbox[2] + 3; x -= 4) {
+                __m128i src = _mm_loadu_si128((__m128i *)(in + x - 4));
+                if (! _mm_test_all_zeros(mm_mask, src)) {
+                    for (int xx = x; xx > x - 4; xx--) {
+                        if (in[xx]) {
+                            bbox[2] = xx + 1;
+                            break;
+                        }
+                    }
+                    break;
+                }
+            }
+            for (; x >= bbox[2]; x--) {
+                if (in[x] & mask) {
+                    bbox[2] = x + 1;
+                    break;
+                }
+            }
+        }
     }
 
     return 1; /* ok */
