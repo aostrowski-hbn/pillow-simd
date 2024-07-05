@@ -201,22 +201,19 @@ ImagingGetBBox(Imaging im, int bbox[4], int alpha_only) {
                     break;
                 }
             }
-            for (x = im->xsize - 1; x >= bbox[2] + 3; x -= 4) {
-                __m128i src = _mm_loadu_si128((__m128i *)(in + x - 4));
+            for (x = bbox[2]; x < im->xsize - 3; x += 4) {
+                __m128i src = _mm_loadu_si128((__m128i *)(in + x));
                 if (! _mm_test_all_zeros(mm_mask, src)) {
-                    for (int xx = x; xx > x - 4; xx--) {
+                    for (int xx = x; xx < x + 4; xx++) {
                         if (in[xx]) {
                             bbox[2] = xx + 1;
-                            break;
                         }
                     }
-                    break;
                 }
             }
-            for (; x >= bbox[2]; x--) {
+            for (; x < im->xsize; x++) {
                 if (in[x] & mask) {
                     bbox[2] = x + 1;
-                    break;
                 }
             }
         }
