@@ -1122,8 +1122,8 @@ class TiffImageFile(ImageFile.ImageFile):
         # Create a new core image object on second and
         # subsequent frames in the image. Image may be
         # different size/mode.
-        Image._decompression_bomb_check(self.size)
-        self.im = Image.core.new(self.mode, self.size)
+        Image._decompression_bomb_check(self._tile_size)
+        self.im = Image.core.new(self.mode, self._tile_size)
 
     def _seek(self, frame):
         self.fp = self._fp
@@ -1201,6 +1201,12 @@ class TiffImageFile(ImageFile.ImageFile):
         if self.tile and self.use_load_libtiff:
             return self._load_libtiff()
         return super().load()
+
+    def load_prepare(self):
+        # Restore self.size during image allocation
+        self._size, old_size = self._tile_size, self._size
+        super().load_prepare()
+        self._size = old_size
 
     def load_end(self):
         if self._tile_orientation:
@@ -1354,10 +1360,16 @@ class TiffImageFile(ImageFile.ImageFile):
         logger.debug(f"- fill_order: {fillorder}")
         logger.debug(f"- YCbCr subsampling: {self.tag.get(YCBCRSUBSAMPLING)}")
 
+        self._tile_orientation = self.tag_v2.get(0x0112)
+
         # size
         xsize = int(self.tag_v2.get(IMAGEWIDTH))
         ysize = int(self.tag_v2.get(IMAGELENGTH))
-        self._size = xsize, ysize
+        self._tile_size = xsize, ysize
+        if self._tile_orientation in (5, 6, 7, 8):
+            self._size = ysize, xsize
+        else:
+            self._size = xsize, ysize
 
         logger.debug(f"- size: {self.size}")
 
@@ -1500,7 +1512,7 @@ class TiffImageFile(ImageFile.ImageFile):
             if STRIPOFFSETS in self.tag_v2:
                 offsets = self.tag_v2[STRIPOFFSETS]
                 h = self.tag_v2.get(ROWSPERSTRIP, ysize)
-                w = self.size[0]
+                w = xsize
             else:
                 # tiled image
                 offsets = self.tag_v2[TILEOFFSETS]
@@ -1530,9 +1542,9 @@ class TiffImageFile(ImageFile.ImageFile):
                     )
                 )
                 x = x + w
-                if x >= self.size[0]:
+                if x >= xsize:
                     x, y = 0, y + h
-                    if y >= self.size[1]:
+                    if y >= ysize:
                         x = y = 0
                         layer += 1
         else:
@@ -1549,9 +1561,6 @@ class TiffImageFile(ImageFile.ImageFile):
         if self.mode in ["P", "PA"]:
             palette = [o8(b // 256) for b in self.tag_v2[COLORMAP]]
             self.palette = ImagePalette.raw("RGB;L", b"".join(palette))
-
-        self._tile_orientation = self.tag_v2.get(0x0112)
-
 
 #
 # --------------------------------------------------------------------
