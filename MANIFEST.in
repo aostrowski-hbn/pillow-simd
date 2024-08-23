@@ -9,12 +9,10 @@ include *.txt
 include LICENSE
 include Makefile
 include tox.ini
-graft Tests
 graft src
 graft depends
 graft winbuild
 graft docs
-prune Tests
 
 # build/src control detritus
 exclude .appveyor.yml
@@ -23,6 +21,7 @@ exclude .codecov.yml
 exclude .editorconfig
 exclude .readthedocs.yml
 exclude azure-pipelines.yml
+global-exclude .DS_Store
 global-exclude .git*
 global-exclude *.pyc
 global-exclude *.so
