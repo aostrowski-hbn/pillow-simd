@@ -22,9 +22,10 @@ from setuptools import Extension, setup
 
 def get_version():
     version_file = "src/PIL/_version.py"
-    with open(version_file, "r") as f:
-        exec(compile(f.read(), version_file, "exec"))
-    return locals()["__version__"]
+    l = {}
+    with open(version_file, encoding="utf-8") as f:
+        exec(f.read(), {}, l)
+    return l["__version__"]
 
 
 NAME = "Pillow-SIMD"
