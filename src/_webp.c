@@ -7,6 +7,13 @@
 #include <webp/mux.h>
 #include <webp/demux.h>
 
+#ifdef __aarch64__
+#include <arm_neon.h>
+#endif
+#ifdef __SSE4_1__
+#include <smmintrin.h>
+#endif
+
 /*
  * Check the versions from mux.h and demux.h, to ensure the WebPAnimEncoder and
  * WebPAnimDecoder APIs are present (initial support was added in 0.5.0). The
@@ -108,14 +115,41 @@ import_frame_libwebp(WebPPicture *frame, Imaging im) {
     for (int y = 0; y < im->ysize; ++y) {
         UINT8 *src = (UINT8 *)im->image32[y];
         UINT32 *dst = frame->argb + frame->argb_stride * y;
+        int x = 0;
+#ifdef __aarch64__
+        uint8x16_t permute_mask = {2, 1, 0, 3, 6, 5, 4, 7, 10, 9, 8, 11, 14, 13, 12, 15};
+        uint8x16_t alpha_mask = vreinterpretq_u8_u32(vdupq_n_u32(0x00));
         if (ignore_fourth_channel) {
-            for (int x = 0; x < im->xsize; ++x) {
+            alpha_mask = vreinterpretq_u8_u32(vdupq_n_u32(0xff000000));
+        }
+        for (; x < im->xsize - 3; x += 4) {
+            uint8x16_t src_pixels = vld1q_u8(&src[x * 4]);
+            uint8x16_t result = vqtbl1q_u8(src_pixels, permute_mask);
+            result = vorrq_u8(result, alpha_mask);
+            vst1q_u32(&dst[x], vreinterpretq_u32_u8(result));
+        }
+#endif
+#ifdef __SSE4_1__
+        __m128i permute_mask = _mm_set_epi8(15, 12, 13, 14, 11, 8, 9, 10, 7, 4, 5, 6, 3, 0, 1, 2);
+        __m128i alpha_mask = _mm_setzero_si128();
+        if (ignore_fourth_channel) {
+            alpha_mask = _mm_set1_epi32(0xff000000);
+        }
+        for (; x < im->xsize - 3; x += 4) {
+            __m128i src_pixels = _mm_loadu_si128((__m128i *)&src[x * 4]);
+            __m128i result = _mm_shuffle_epi8(src_pixels, permute_mask);
+            result = _mm_or_si128(result, alpha_mask);
+            _mm_storeu_si128((__m128i *)&dst[x], result);
+        }
+#endif
+        if (ignore_fourth_channel) {
+            for (; x < im->xsize; x++) {
                 dst[x] =
                     ((UINT32)(src[x * 4 + 2]) | ((UINT32)(src[x * 4 + 1]) << 8) |
                      ((UINT32)(src[x * 4]) << 16) | (0xff << 24));
             }
         } else {
-            for (int x = 0; x < im->xsize; ++x) {
+            for (; x < im->xsize; x++) {
                 dst[x] =
                     ((UINT32)(src[x * 4 + 2]) | ((UINT32)(src[x * 4 + 1]) << 8) |
                      ((UINT32)(src[x * 4]) << 16) | ((UINT32)(src[x * 4 + 3]) << 24));
