@@ -760,6 +760,7 @@ _prepare_lut_table(PyObject *table, Py_ssize_t table_size) {
 
 /* NOTE: This value should be the same as in ColorLUT.c */
 #define PRECISION_BITS (16 - 8 - 2)
+#define PRECISION_ROUNDING (1 << (PRECISION_BITS - 1))
 
     const char *wrong_size =
         ("The table should have table_channels * "
@@ -824,8 +825,8 @@ _prepare_lut_table(PyObject *table, Py_ssize_t table_size) {
                 break;
         }
         /* Max value for INT16 */
-        if (item >= (0x7fff - 0.5) / (255 << PRECISION_BITS)) {
-            prepared[i] = 0x7fff;
+        if (item >= (0x7fff - 0.5 - PRECISION_ROUNDING) / (255 << PRECISION_BITS)) {
+            prepared[i] = 0x7fff - PRECISION_ROUNDING;
             continue;
         }
         /* Min value for INT16 */
@@ -841,6 +842,7 @@ _prepare_lut_table(PyObject *table, Py_ssize_t table_size) {
     }
 
 #undef PRECISION_BITS
+#undef PRECISION_ROUNDING
     if (free_table_data) {
         free(table_data);
     }
