@@ -1,12 +1,16 @@
 Changelog (Pillow-SIMD)
 =======================
 
+9.5.0.post2 & 9.4.0.post2 & 9.3.0.post2 & 9.2.0.post2 & 9.1.1.post2 & 9.0.0.post3
+---------------------------------------------------------------------------------
+
+- Fixed color ovrflow in LUT processing
+
 9.0.0.post1
 -----------
 
 - Fixed possible overflow in LUT processing
 - Restored compativlity with Visual C Compiler
-
 
 7.0.0.post4
 -----------

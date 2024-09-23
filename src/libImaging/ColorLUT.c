@@ -233,7 +233,7 @@ ImagingColorLUT3D_linear(
             __m128i source = _mm_loadu_si128((__m128i *) &rowIn[x]);
             // scale up to 16 bits, but scale * 255 * 256 up to 31 bits
             // bi, gi and ri - 6 bits index
-            // rs, rs and rs - 9 bits shift
+            // bs, gs and rs - 9 bits shift
             // 00 bi3.bs3 gi3.gs3 ri3.rs3 00 bi2.bs2 gi2.gs2 ri2.rs2
             // 00 bi1.bs1 gi1.gs1 ri1.rs1 00 bi0.bs0 gi0.gs0 ri0.rs0
             __m256i index = _mm256_mulhi_epu16(scale256,
@@ -248,7 +248,7 @@ ImagingColorLUT3D_linear(
                 __m128i next_source = _mm_loadu_si128((__m128i *) &rowIn[x + 4]);
                 // scale up to 16 bits, but scale * 255 * 256 up to 31 bits
                 // bi, gi and ri - 6 bits index
-                // rs, rs and rs - 9 bits shift
+                // bs, gs and rs - 9 bits shift
                 // 00 bi3.bs3 gi3.gs3 ri3.rs3 00 bi2.bs2 gi2.gs2 ri2.rs2
                 // 00 bi1.bs1 gi1.gs1 ri1.rs1 00 bi0.bs0 gi0.gs0 ri0.rs0
                 __m256i next_index = _mm256_mulhi_epu16(scale256,
@@ -332,7 +332,7 @@ ImagingColorLUT3D_linear(
             __m128i source = _mm_loadl_epi64((__m128i *) &rowIn[x]);
             // scale up to 16 bits, but scale * 255 * 256 up to 31 bits
             // bi, gi and ri - 6 bits index
-            // rs, rs and rs - 9 bits shift
+            // bs, gs and rs - 9 bits shift
             // 00 bi1.bs1 gi1.gs1 ri1.rs1 00 bi0.bs0 gi0.gs0 ri0.rs0
             __m128i index = _mm_mulhi_epu16(scale,
                 _mm_unpacklo_epi8(_mm_setzero_si128(), source));
@@ -402,7 +402,7 @@ ImagingColorLUT3D_linear(
             __m128i source = _mm_cvtsi32_si128(rowIn[x]);
             // scale up to 16 bits, but scale * 255 * 256 up to 31 bits
             // bi, gi and ri - 6 bits index
-            // rs, rs and rs - 9 bits shift
+            // bs, gs and rs - 9 bits shift
             // 00 00 00 00 00 bi.bs gi.gs ri.rs
             __m128i index = _mm_mulhi_epu16(scale,
                 _mm_unpacklo_epi8(_mm_setzero_si128(), source));
